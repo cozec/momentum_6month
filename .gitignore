@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+
+logs/
+results/
+plots/
+
+data/raw_prices/
+data/processed/
+data/yfinance_cache/
+
+*.pyc
+.DS_Store

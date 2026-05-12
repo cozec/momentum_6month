@@ -1,0 +1,13 @@
+metric,value
+CAGR,0.4964709774459921
+annualized_volatility,0.3951913516259832
+Sharpe_ratio,1.2238750792533208
+max_drawdown,-0.35795570246715325
+win_rate_vs_QQQ,0.5555555555555556
+average_monthly_return,0.04030540389928977
+median_monthly_return,0.021513310348435732
+best_month,0.39994454057294615
+worst_month,-0.2597106547077439
+total_return,49.92322627627754
+number_of_rebalances,117.0
+average_turnover,0.7663817663817665
