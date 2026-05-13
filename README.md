@@ -1,6 +1,6 @@
 # Nasdaq-100 Monthly Momentum Backtest
 
-This project implements a monthly momentum rotation strategy for a survivorship-biased Nasdaq-100 universe. On each first trading day of the month, the strategy ranks eligible tickers by their prior six completed monthly returns, selects the top three names, holds them for one month, and compares the result with `QQQ`.
+This project implements a monthly momentum rotation strategy for a survivorship-biased Nasdaq-100 universe. On each first trading day of the month, the strategy ranks eligible tickers by their prior six completed monthly returns, selects the top three names, holds them for one month, and compares the result with `QQQ` and `TQQQ`.
 
 ## Project Layout
 
@@ -37,7 +37,8 @@ source .venv/bin/activate
   --end-date 2026-05-12 \
   --top-n 3 \
   --lookback-months 6 \
-  --benchmark QQQ
+  --benchmark QQQ \
+  --secondary-benchmark TQQQ
 ```
 
 Optional score methods:
@@ -50,6 +51,7 @@ Optional score methods:
 - `outputs/monthly_selections.csv`
 - `outputs/portfolio_returns.csv`
 - `outputs/summary_stats.csv`
+- `outputs/comparison_stats.csv`
 - `outputs/last_12_month_picks.csv`
 - `outputs/charts/*.png`
 
@@ -57,6 +59,12 @@ The reporting layer also creates:
 
 - `outputs/charts/last_12_month_pick_rotation.png`
 - `outputs/charts/last_12_month_selection_frequency.png`
+
+Reference defaults:
+
+- Transaction cost: `0` bps
+- Slippage: `0` bps
+- Minimum valid return history: `6` completed months
 
 ## Last 12 Months Pick Rotation
 

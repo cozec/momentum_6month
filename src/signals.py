@@ -41,6 +41,26 @@ def calculate_momentum_scores(
     return valid.mean()
 
 
+def filter_tickers_with_min_history(
+    monthly_returns: pd.DataFrame,
+    tickers: list[str],
+    rebalance_date: pd.Timestamp,
+    min_months: int,
+) -> list[str]:
+    """Keep tickers with enough completed, non-null monthly returns."""
+    if monthly_returns.empty or min_months <= 0:
+        return [ticker for ticker in tickers if ticker in monthly_returns.columns]
+    completed_month_end = rebalance_date.to_period("M").to_timestamp("M") - pd.offsets.MonthEnd(1)
+    history = monthly_returns.loc[:completed_month_end]
+    valid_tickers: list[str] = []
+    for ticker in tickers:
+        if ticker not in history.columns:
+            continue
+        if int(history[ticker].dropna().shape[0]) >= min_months:
+            valid_tickers.append(ticker)
+    return valid_tickers
+
+
 def select_top_n(momentum_scores: pd.Series, n: int = 3) -> pd.DataFrame:
     """Rank and return the top-scoring tickers."""
     ranked = momentum_scores.dropna().sort_values(ascending=False).head(n)

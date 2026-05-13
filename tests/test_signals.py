@@ -7,6 +7,7 @@ import pandas as pd
 from src.signals import (
     calculate_momentum_scores,
     calculate_monthly_returns,
+    filter_tickers_with_min_history,
     get_first_trading_days,
     select_top_n,
 )
@@ -46,3 +47,21 @@ def test_first_trading_days() -> None:
     )
     first_days = get_first_trading_days(prices)
     assert first_days.tolist() == [pd.Timestamp("2026-01-02"), pd.Timestamp("2026-02-02")]
+
+
+def test_minimum_history_filter_uses_completed_months_only() -> None:
+    """Eligibility should honor the configured minimum completed-month count."""
+    monthly = pd.DataFrame(
+        {
+            "AAA": [0.01, 0.02, 0.03, 0.04, 0.05, 0.06],
+            "BBB": [0.01, 0.02, None, 0.04, 0.05, 0.06],
+        },
+        index=pd.date_range("2025-11-30", periods=6, freq="ME"),
+    )
+    tickers = filter_tickers_with_min_history(
+        monthly,
+        ["AAA", "BBB"],
+        pd.Timestamp("2026-06-01"),
+        min_months=6,
+    )
+    assert tickers == ["AAA"]

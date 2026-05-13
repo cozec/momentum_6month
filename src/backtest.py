@@ -13,6 +13,7 @@ from .membership import get_eligible_universe, load_nasdaq100_membership
 from .signals import (
     calculate_momentum_scores,
     calculate_monthly_returns,
+    filter_tickers_with_min_history,
     get_first_trading_days,
     select_top_n,
 )
@@ -66,13 +67,17 @@ def run_backtest(config: BacktestConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Run the complete monthly momentum backtest and persist result CSVs."""
     ensure_directories([config.raw_prices_dir, config.outputs_dir, config.charts_dir])
     membership = load_nasdaq100_membership(str(config.membership_path))
-    all_tickers = sorted(set(membership["ticker"]).union({config.benchmark}))
+    all_tickers = sorted(
+        set(membership["ticker"]).union({config.benchmark, config.secondary_benchmark})
+    )
     download_price_data(all_tickers, config.start_date, config.end_date, config.raw_prices_dir)
     prices = load_price_matrix(config.raw_prices_dir, all_tickers)
     if prices.empty:
         raise RuntimeError("No cached prices are available for the backtest.")
 
-    monthly_returns = calculate_monthly_returns(prices.drop(columns=[config.benchmark], errors="ignore"))
+    monthly_returns = calculate_monthly_returns(
+        prices.drop(columns=[config.benchmark, config.secondary_benchmark], errors="ignore")
+    )
     rebalance_dates = get_first_trading_days(prices[[config.benchmark]].dropna(how="all"))
     rebalance_dates = rebalance_dates[
         (rebalance_dates >= pd.Timestamp(config.start_date))
@@ -83,13 +88,19 @@ def run_backtest(config: BacktestConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
     portfolio_rows: list[dict[str, object]] = []
     portfolio_value = config.initial_capital
     qqq_start_price: float | None = None
+    tqqq_start_price: float | None = None
     prior_holdings: set[str] = set()
     transaction_rate = pct_cost_from_bps(config.transaction_cost_bps)
     slippage_rate = pct_cost_from_bps(config.slippage_bps)
 
     for entry_date, exit_date in zip(rebalance_dates[:-1], rebalance_dates[1:]):
         eligible = get_eligible_universe(membership, entry_date)
-        eligible_with_prices = [ticker for ticker in eligible if ticker in monthly_returns.columns]
+        eligible_with_prices = filter_tickers_with_min_history(
+            monthly_returns,
+            eligible,
+            entry_date,
+            config.min_price_history_months,
+        )
         scores = calculate_momentum_scores(
             monthly_returns[eligible_with_prices].copy() if eligible_with_prices else pd.DataFrame(),
             entry_date,
@@ -123,6 +134,12 @@ def run_backtest(config: BacktestConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
         gross_return = float((selection["weight"] * selection["stock_return"]).sum())
         net_return = gross_return - transaction_cost - slippage_cost
         qqq_return = _benchmark_return(prices, config.benchmark, entry_date, exit_date)
+        tqqq_return = _benchmark_return(
+            prices,
+            config.secondary_benchmark,
+            entry_date,
+            exit_date,
+        )
         excess_return = net_return - qqq_return if pd.notna(qqq_return) else float("nan")
         portfolio_value *= 1.0 + net_return
         if qqq_start_price is None and config.benchmark in prices:
@@ -134,6 +151,17 @@ def run_backtest(config: BacktestConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
             exit_price = prices.at[exit_date, config.benchmark]
             if pd.notna(exit_price) and exit_price > 0:
                 qqq_value = config.initial_capital * (float(exit_price) / qqq_start_price)
+        if tqqq_start_price is None and config.secondary_benchmark in prices:
+            start_price = prices.at[entry_date, config.secondary_benchmark]
+            if pd.notna(start_price) and start_price > 0:
+                tqqq_start_price = float(start_price)
+        tqqq_value = float("nan")
+        if tqqq_start_price is not None and config.secondary_benchmark in prices:
+            exit_price = prices.at[exit_date, config.secondary_benchmark]
+            if pd.notna(exit_price) and exit_price > 0:
+                tqqq_value = config.initial_capital * (
+                    float(exit_price) / tqqq_start_price
+                )
 
         for row in selection.to_dict(orient="records"):
             selection_rows.append(
@@ -158,9 +186,11 @@ def run_backtest(config: BacktestConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
                 "slippage_cost": slippage_cost,
                 "portfolio_return_net": net_return,
                 "qqq_return": qqq_return,
+                "tqqq_return": tqqq_return,
                 "excess_return": excess_return,
                 "portfolio_value": portfolio_value,
                 "qqq_value": qqq_value,
+                "tqqq_value": tqqq_value,
                 "turnover": turnover,
             }
         )

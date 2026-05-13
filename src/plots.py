@@ -19,14 +19,17 @@ def _save(fig: plt.Figure, path: Path) -> None:
 def plot_equity_curve(
     strategy_returns: pd.Series,
     benchmark_returns: pd.Series,
+    secondary_benchmark_returns: pd.Series,
     output_path: Path,
 ) -> None:
-    """Plot cumulative strategy and benchmark equity curves."""
+    """Plot cumulative strategy, QQQ, and TQQQ equity curves."""
     strategy_curve = (1.0 + strategy_returns.fillna(0.0)).cumprod()
     benchmark_curve = (1.0 + benchmark_returns.fillna(0.0)).cumprod()
+    secondary_curve = (1.0 + secondary_benchmark_returns.fillna(0.0)).cumprod()
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.plot(strategy_curve.index, strategy_curve.values, label="Strategy")
     ax.plot(benchmark_curve.index, benchmark_curve.values, label="QQQ")
+    ax.plot(secondary_curve.index, secondary_curve.values, label="TQQQ")
     ax.set_title("Equity Curve")
     ax.legend()
     ax.grid(alpha=0.25)
@@ -59,6 +62,7 @@ def generate_all_charts(
     plot_equity_curve(
         chart_data["portfolio_return_net"],
         chart_data["qqq_return"],
+        chart_data["tqqq_return"],
         charts_dir / "equity_curve.png",
     )
     plot_drawdowns(chart_data["portfolio_value"], charts_dir / "drawdown_curve.png")

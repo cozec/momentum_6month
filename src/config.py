@@ -14,11 +14,12 @@ class BacktestConfig:
     start_date: str = "2016-01-01"
     end_date: str = "2026-05-12"
     benchmark: str = "QQQ"
+    secondary_benchmark: str = "TQQQ"
     top_n: int = 3
     lookback_months: int = 6
     initial_capital: float = 100_000.0
-    transaction_cost_bps: float = 5.0
-    slippage_bps: float = 5.0
+    transaction_cost_bps: float = 0.0
+    slippage_bps: float = 0.0
     min_price_history_months: int = 6
     score_method: str = "average_monthly_return"
     rebalance_frequency: str = "monthly"
