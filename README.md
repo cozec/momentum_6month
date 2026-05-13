@@ -41,6 +41,33 @@ source .venv/bin/activate
   --secondary-benchmark TQQQ
 ```
 
+Generate only the next month signal basket:
+
+```bash
+.venv/bin/python main.py \
+  --start-date 2016-01-01 \
+  --end-date 2026-05-12 \
+  --top-n 3 \
+  --lookback-months 6 \
+  --benchmark QQQ \
+  --secondary-benchmark TQQQ \
+  --next-picks-only
+```
+
+Run the local dashboard:
+
+```bash
+.venv/bin/python webapp.py
+```
+
+Then open the dashboard in your browser at `http://127.0.0.1:5050`.
+
+Dashboard behavior:
+
+- Page load and manual refresh download fresh market data through today.
+- Reports, plots, current open holdings, and next-preview picks regenerate automatically.
+- On the first trading day of a new month, the previously open basket becomes a completed backtest period once fresh prices are available, and the dashboard surfaces the new open basket.
+
 Optional score methods:
 
 - `average_monthly_return`
@@ -53,6 +80,8 @@ Optional score methods:
 - `outputs/summary_stats.csv`
 - `outputs/comparison_stats.csv`
 - `outputs/last_12_month_picks.csv`
+- `outputs/open_rebalance_picks.csv`
+- `outputs/next_rebalance_picks.csv`
 - `outputs/charts/*.png`
 
 The reporting layer also creates:

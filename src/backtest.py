@@ -15,6 +15,7 @@ from .signals import (
     calculate_monthly_returns,
     filter_tickers_with_min_history,
     get_first_trading_days,
+    get_next_month_start_after_last_price,
     select_top_n,
 )
 from .utils import ensure_directories, load_price_matrix, pct_cost_from_bps
@@ -63,14 +64,23 @@ def _benchmark_return(
     return (float(exit_) / float(entry)) - 1.0
 
 
-def run_backtest(config: BacktestConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
+def run_backtest(
+    config: BacktestConfig,
+    force_refresh_prices: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Run the complete monthly momentum backtest and persist result CSVs."""
     ensure_directories([config.raw_prices_dir, config.outputs_dir, config.charts_dir])
     membership = load_nasdaq100_membership(str(config.membership_path))
     all_tickers = sorted(
         set(membership["ticker"]).union({config.benchmark, config.secondary_benchmark})
     )
-    download_price_data(all_tickers, config.start_date, config.end_date, config.raw_prices_dir)
+    download_price_data(
+        all_tickers,
+        config.start_date,
+        config.end_date,
+        config.raw_prices_dir,
+        force_refresh=force_refresh_prices,
+    )
     prices = load_price_matrix(config.raw_prices_dir, all_tickers)
     if prices.empty:
         raise RuntimeError("No cached prices are available for the backtest.")
@@ -202,3 +212,122 @@ def run_backtest(config: BacktestConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
     portfolio_returns.to_csv(config.outputs_dir / "portfolio_returns.csv", index=False)
     logging.info("Backtest complete with config: %s", asdict(config))
     return selections, portfolio_returns
+
+
+def generate_next_rebalance_picks(
+    config: BacktestConfig,
+    force_refresh_prices: bool = False,
+) -> pd.DataFrame:
+    """Generate top picks for the next month using the latest completed data."""
+    ensure_directories([config.raw_prices_dir, config.outputs_dir])
+    membership = load_nasdaq100_membership(str(config.membership_path))
+    all_tickers = sorted(
+        set(membership["ticker"]).union({config.benchmark, config.secondary_benchmark})
+    )
+    download_price_data(
+        all_tickers,
+        config.start_date,
+        config.end_date,
+        config.raw_prices_dir,
+        force_refresh=force_refresh_prices,
+    )
+    prices = load_price_matrix(config.raw_prices_dir, all_tickers)
+    if prices.empty:
+        raise RuntimeError("No cached prices are available for live signal generation.")
+
+    monthly_returns = calculate_monthly_returns(
+        prices.drop(columns=[config.benchmark, config.secondary_benchmark], errors="ignore")
+    )
+    rebalance_date = get_next_month_start_after_last_price(
+        prices[[config.benchmark]].dropna(how="all")
+    )
+    eligible = get_eligible_universe(membership, rebalance_date)
+    eligible_with_prices = filter_tickers_with_min_history(
+        monthly_returns,
+        eligible,
+        rebalance_date,
+        config.min_price_history_months,
+    )
+    scores = calculate_momentum_scores(
+        monthly_returns[eligible_with_prices].copy()
+        if eligible_with_prices
+        else pd.DataFrame(),
+        rebalance_date,
+        lookback_months=config.lookback_months,
+        score_method=config.score_method,
+    )
+    selection = select_top_n(scores, config.top_n)
+    if selection.empty:
+        output = pd.DataFrame(
+            columns=["rebalance_date", "ticker", "rank", "momentum_score", "weight"]
+        )
+    else:
+        output = selection.copy()
+        output.insert(0, "rebalance_date", rebalance_date)
+    output.to_csv(config.outputs_dir / "next_rebalance_picks.csv", index=False)
+    return output
+
+
+def generate_open_rebalance_picks(
+    config: BacktestConfig,
+    force_refresh_prices: bool = False,
+) -> pd.DataFrame:
+    """Generate picks for the latest started month whose hold is still open."""
+    ensure_directories([config.raw_prices_dir, config.outputs_dir])
+    membership = load_nasdaq100_membership(str(config.membership_path))
+    all_tickers = sorted(
+        set(membership["ticker"]).union({config.benchmark, config.secondary_benchmark})
+    )
+    download_price_data(
+        all_tickers,
+        config.start_date,
+        config.end_date,
+        config.raw_prices_dir,
+        force_refresh=force_refresh_prices,
+    )
+    prices = load_price_matrix(config.raw_prices_dir, all_tickers)
+    if prices.empty:
+        raise RuntimeError("No cached prices are available for open signal generation.")
+
+    monthly_returns = calculate_monthly_returns(
+        prices.drop(columns=[config.benchmark, config.secondary_benchmark], errors="ignore")
+    )
+    rebalance_dates = get_first_trading_days(prices[[config.benchmark]].dropna(how="all"))
+    eligible_dates = rebalance_dates[rebalance_dates <= pd.Timestamp(config.end_date)]
+    if eligible_dates.empty:
+        raise RuntimeError("No active rebalance date is available in cached prices.")
+    rebalance_date = pd.Timestamp(eligible_dates.max())
+
+    eligible = get_eligible_universe(membership, rebalance_date)
+    eligible_with_prices = filter_tickers_with_min_history(
+        monthly_returns,
+        eligible,
+        rebalance_date,
+        config.min_price_history_months,
+    )
+    scores = calculate_momentum_scores(
+        monthly_returns[eligible_with_prices].copy()
+        if eligible_with_prices
+        else pd.DataFrame(),
+        rebalance_date,
+        lookback_months=config.lookback_months,
+        score_method=config.score_method,
+    )
+    selection = select_top_n(scores, config.top_n)
+    if selection.empty:
+        output = pd.DataFrame(
+            columns=[
+                "rebalance_date",
+                "ticker",
+                "rank",
+                "momentum_score",
+                "weight",
+                "holding_status",
+            ]
+        )
+    else:
+        output = selection.copy()
+        output.insert(0, "rebalance_date", rebalance_date)
+        output["holding_status"] = "open"
+    output.to_csv(config.outputs_dir / "open_rebalance_picks.csv", index=False)
+    return output

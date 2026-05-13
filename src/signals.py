@@ -14,6 +14,16 @@ def get_first_trading_days(price_df: pd.DataFrame) -> pd.DatetimeIndex:
     return pd.DatetimeIndex(first_days.tolist())
 
 
+def get_next_month_start_after_last_price(price_df: pd.DataFrame) -> pd.Timestamp:
+    """Return the next month-start signal date after the latest cached price."""
+    if price_df.empty:
+        raise ValueError("Cannot infer the next rebalance date from empty prices.")
+    latest_date = price_df.dropna(how="all").index.max()
+    if pd.isna(latest_date):
+        raise ValueError("Cannot infer the next rebalance date without valid prices.")
+    return (pd.Timestamp(latest_date).to_period("M") + 1).to_timestamp()
+
+
 def calculate_monthly_returns(price_df: pd.DataFrame) -> pd.DataFrame:
     """Calculate month-end returns from daily adjusted close prices."""
     month_end_prices = price_df.sort_index().resample("ME").last()

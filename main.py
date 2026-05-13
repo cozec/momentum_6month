@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import argparse
 
-from src.backtest import run_backtest
+from src.backtest import (
+    generate_next_rebalance_picks,
+    generate_open_rebalance_picks,
+    run_backtest,
+)
 from src.config import BacktestConfig
 from src.metrics import (
     calculate_comparison_stats,
@@ -25,6 +29,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lookback-months", type=int, default=6)
     parser.add_argument("--benchmark", default="QQQ")
     parser.add_argument("--secondary-benchmark", default="TQQQ")
+    parser.add_argument(
+        "--next-picks-only",
+        action="store_true",
+        help="Generate next_rebalance_picks.csv without running the full backtest.",
+    )
     parser.add_argument(
         "--score-method",
         choices=["average_monthly_return", "compound_6m_return"],
@@ -47,7 +56,11 @@ def main() -> None:
     )
     ensure_directories([config.outputs_dir, config.charts_dir, config.logs_dir])
     configure_logging(config.logs_dir / "backtest.log")
+    if args.next_picks_only:
+        generate_next_rebalance_picks(config)
+        return
     selections, portfolio_returns = run_backtest(config)
+    open_picks = generate_open_rebalance_picks(config)
     summary = calculate_summary_stats(portfolio_returns)
     summary.to_csv(config.outputs_dir / "summary_stats.csv", index=False)
     comparison = calculate_comparison_stats(portfolio_returns)
@@ -62,7 +75,9 @@ def main() -> None:
         selections,
         config.outputs_dir,
         config.charts_dir,
+        open_picks=open_picks,
     )
+    generate_next_rebalance_picks(config)
 
 
 if __name__ == "__main__":

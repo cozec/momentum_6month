@@ -8,12 +8,13 @@
 - Prior-six-completed-month momentum scoring with optional compound return scoring
 - Monthly rebalance accounting, turnover, transaction cost, slippage, and benchmark comparison
 - Summary statistics and requested charts
+- Local Flask dashboard for current picks, recent pick history, and live refreshes
 - CLI entry point and unit tests
 
 ## Test Results
 
 - `.venv/bin/python -m pytest -q`
-- Result: `6 passed`
+- Result: `7 passed`
 - One environment warning remains from `urllib3` about the local Python 3.9 LibreSSL build.
 
 ## Backtest Run
@@ -49,8 +50,8 @@ These figures are intentionally not presented as clean institutional-grade resea
 <!-- PERFORMANCE_TABLE_START -->
 | Metric | Strategy | QQQ Buy & Hold | TQQQ Buy & Hold |
 |---|---:|---:|---:|
-| Final equity | $37,026,793.12 | $622,982.32 | $2,743,567.48 |
-| Total return | 36,926.79% | 522.98% | 2,643.57% |
+| Final equity | $37,026,781.04 | $622,982.40 | $2,743,567.20 |
+| Total return | 36,926.78% | 522.98% | 2,643.57% |
 | CAGR | 83.42% | 20.64% | 40.45% |
 | Annualized volatility | 51.65% | 20.11% | 62.87% |
 | Sharpe ratio | 1.43 | 1.04 | 0.86 |

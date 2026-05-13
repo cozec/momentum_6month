@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Momentum 6M Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  </head>
+  <body>
+    <main class="dashboard">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Nasdaq-100 Monthly Momentum</p>
+          <h1>Momentum 6M Dashboard</h1>
+        </div>
+        <div class="status-wrap">
+          <button id="refreshButton" class="refresh-button" type="button">Refresh data</button>
+          <p id="statusText" class="status-text">Preparing latest signals...</p>
+        </div>
+      </header>
+
+      <section class="hero-grid">
+        <article class="panel current-panel">
+          <div class="panel-head">
+            <h2>Current Open Basket</h2>
+            <span id="openDate" class="chip">Loading</span>
+          </div>
+          <div id="openPicks" class="pick-grid"></div>
+        </article>
+
+        <article class="panel performance-panel">
+          <div class="panel-head">
+            <h2>Performance Snapshot</h2>
+            <span id="windowText" class="chip">Loading</span>
+          </div>
+          <div id="performanceCards" class="metric-grid"></div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Recent Monthly Picks</h2>
+          <span class="subtle-label">Closed months plus current open hold</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Pick 1</th>
+                <th>Pick 2</th>
+                <th>Pick 3</th>
+                <th>Avg Momentum</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="historyRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="visual-grid">
+        <article class="panel media-panel">
+          <div class="panel-head">
+            <h2>Pick Rotation</h2>
+          </div>
+          <img src="/outputs/charts/last_12_month_pick_rotation.png" alt="Last 12 months pick rotation" id="rotationChart">
+        </article>
+      </section>
+
+      <section class="panel next-panel">
+        <div class="panel-head">
+          <h2>Next Rebalance Preview</h2>
+          <span id="nextDate" class="chip">Loading</span>
+        </div>
+        <div id="nextPicks" class="pick-grid compact"></div>
+      </section>
+    </main>
+    <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+  </body>
+</html>

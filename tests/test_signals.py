@@ -9,6 +9,7 @@ from src.signals import (
     calculate_monthly_returns,
     filter_tickers_with_min_history,
     get_first_trading_days,
+    get_next_month_start_after_last_price,
     select_top_n,
 )
 
@@ -65,3 +66,12 @@ def test_minimum_history_filter_uses_completed_months_only() -> None:
         min_months=6,
     )
     assert tickers == ["AAA"]
+
+
+def test_next_month_start_after_last_price() -> None:
+    """Live signal mode should target the next month after the last cached price."""
+    prices = pd.DataFrame(
+        {"QQQ": [1.0, 2.0]},
+        index=pd.to_datetime(["2026-05-28", "2026-05-29"]),
+    )
+    assert get_next_month_start_after_last_price(prices) == pd.Timestamp("2026-06-01")

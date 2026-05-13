@@ -30,6 +30,7 @@ def download_price_data(
     start_date: str,
     end_date: str,
     raw_prices_dir: Path,
+    force_refresh: bool = False,
 ) -> dict[str, Path]:
     """Download adjusted OHLCV prices with per-ticker CSV caching."""
     raw_prices_dir.mkdir(parents=True, exist_ok=True)
@@ -40,7 +41,7 @@ def download_price_data(
     cached_paths: dict[str, Path] = {}
     for ticker in sorted(set(tickers)):
         output_path = raw_prices_dir / f"{ticker}.csv"
-        if output_path.exists():
+        if output_path.exists() and not force_refresh:
             cached_paths[ticker] = output_path
             continue
         try:

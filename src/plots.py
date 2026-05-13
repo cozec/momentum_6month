@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch, Rectangle
 import pandas as pd
@@ -103,6 +106,7 @@ def generate_last_year_pick_views(
     outputs_dir: Path,
     charts_dir: Path,
     months: int = 12,
+    open_picks: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Create a compact last-year picks table and two supporting charts."""
     if portfolio_returns.empty or monthly_selections.empty:
@@ -116,6 +120,17 @@ def generate_last_year_pick_views(
     selections["rebalance_date"] = pd.to_datetime(selections["rebalance_date"])
     recent_selections = selections[selections["rebalance_date"].isin(recent_dates)].copy()
     recent_returns = returns[returns["rebalance_date"].isin(recent_dates)].copy()
+    recent_selections["holding_status"] = "closed"
+    open_frame = pd.DataFrame()
+    if open_picks is not None and not open_picks.empty:
+        open_frame = open_picks.copy()
+        open_frame["rebalance_date"] = pd.to_datetime(open_frame["rebalance_date"])
+        open_frame["holding_status"] = "open"
+        recent_dates = returns["rebalance_date"].sort_values().tail(max(months - 1, 0))
+        recent_selections = selections[selections["rebalance_date"].isin(recent_dates)].copy()
+        recent_returns = returns[returns["rebalance_date"].isin(recent_dates)].copy()
+        recent_selections["holding_status"] = "closed"
+        recent_selections = pd.concat([recent_selections, open_frame], ignore_index=True)
     if recent_selections.empty:
         return pd.DataFrame()
 
@@ -140,7 +155,11 @@ def generate_last_year_pick_views(
         on="rebalance_date",
         how="left",
     )
-    table = table.sort_values("rebalance_date")
+    status = (
+        recent_selections.groupby("rebalance_date", as_index=False)["holding_status"]
+        .agg(lambda values: "open" if "open" in set(values) else "closed")
+    )
+    table = table.merge(status, on="rebalance_date", how="left").sort_values("rebalance_date")
     table.to_csv(outputs_dir / "last_12_month_picks.csv", index=False)
 
     timeline = recent_selections.copy().sort_values(["rebalance_date", "rank"])
@@ -157,11 +176,12 @@ def generate_last_year_pick_views(
     for row in timeline.itertuples(index=False):
         x_pos = month_lookup[row.rebalance_date]
         y_pos = 3 - int(row.rank)
+        is_open = getattr(row, "holding_status", "closed") == "open"
         rect = Rectangle(
             (x_pos, y_pos),
             1.0,
             1.0,
-            facecolor=ticker_colors[row.ticker],
+            facecolor="#ffd166" if is_open else ticker_colors[row.ticker],
             edgecolor="white",
             linewidth=1.2,
         )
@@ -190,6 +210,8 @@ def generate_last_year_pick_views(
         Patch(facecolor=color, edgecolor="none", label=ticker)
         for ticker, color in ticker_colors.items()
     ]
+    if not open_frame.empty:
+        legend_handles.append(Patch(facecolor="#ffd166", edgecolor="none", label="Open Hold"))
     ax.legend(
         handles=legend_handles,
         loc="upper center",
@@ -199,9 +221,21 @@ def generate_last_year_pick_views(
     )
     _save(fig, charts_dir / "last_12_month_pick_rotation.png")
 
-    frequency = timeline["ticker"].value_counts().sort_values()
+    closed_frequency = (
+        timeline[timeline["holding_status"] == "closed"]["ticker"].value_counts()
+    )
+    open_frequency = (
+        timeline[timeline["holding_status"] == "open"]["ticker"].value_counts()
+    )
+    frequency_index = closed_frequency.index.union(open_frequency.index)
+    frequency = pd.DataFrame(
+        {
+            "Closed Holds": closed_frequency.reindex(frequency_index, fill_value=0),
+            "Open Hold": open_frequency.reindex(frequency_index, fill_value=0),
+        }
+    ).sort_values(["Closed Holds", "Open Hold"])
     fig, ax = plt.subplots(figsize=(9, 5))
-    frequency.plot.barh(ax=ax, color="#33658a")
+    frequency.plot.barh(ax=ax, stacked=True, color=["#33658a", "#ffd166"])
     ax.set_title("Last 12 Months: Selection Frequency")
     ax.set_xlabel("Months Selected")
     ax.grid(axis="x", alpha=0.25)
